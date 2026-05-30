@@ -1,68 +1,51 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"os"
+	"time"
 
 	berryone "github.com/BerrySDK/berryone"
 )
 
 func main() {
 	client, err := berryone.NewBerryOne(berryone.ClientOptions{
-		SessionID: "interactive-session",
+		SessionID:         "native-session",
+		AuthFolder:        ".auth",
+		PrintQRInTerminal: true,
+		QRSmall:           true,
+		Transport: berryone.NewNativeTransport(berryone.NativeTransportOptions{
+			AuthFolder: ".auth",
+		}),
+		ReconnectDelay: 3 * time.Second,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := client.ConnectWithLink(context.Background()); err != nil {
-		log.Fatal(err)
-	}
+	client.On(berryone.EventQR, func(payload any) {
+		fmt.Println("QR generated. Scan it with WhatsApp Linked Devices.")
+	})
 
-	buttons := berryone.ButtonsPayload{
-		Text:   "Choose an option",
-		Footer: "Go Edition",
-		Buttons: []berryone.ButtonRow{
-			{ID: "docs", Title: "Open docs", Kind: berryone.ButtonKindReply},
-			{ID: "support", Title: "Support", Kind: berryone.ButtonKindReply},
-		},
-	}
+	client.On(berryone.EventProtocolError, func(payload any) {
+		fmt.Printf("protocol error: %#v\n", payload)
+	})
 
-	buttonResponse, err := client.SendButtons(
-		context.Background(),
-		"5511999999999@s.whatsapp.net",
-		buttons,
-	)
-	if err != nil {
-		log.Fatal(err)
+	err = client.ConnectWithQR(context.Background())
+	if errors.Is(err, berryone.ErrNativeHandshakeNotImplemented) {
+		fmt.Println("native status: QR rendering works, but the real WhatsApp handshake is still being ported.")
+		fmt.Println("The process will stay open so you can inspect the QR. Press Enter to close.")
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+		return
 	}
-
-	list := berryone.ListPayload{
-		Title:      "BerryOne Menu",
-		Text:       "Pick a workflow",
-		ButtonText: "See options",
-		Footer:     "BerryOne",
-		Sections: []berryone.ListSection{
-			{
-				Title: "Main",
-				Rows: []berryone.ListRow{
-					{ID: "connect", Title: "Connect", Description: "Session onboarding"},
-					{ID: "send", Title: "Send Message", Description: "Basic text flow"},
-				},
-			},
-		},
+	if errors.Is(err, berryone.ErrNativeRegistrationPending) {
+		fmt.Println("native status: the real websocket handshake reached the server hello stage.")
+		fmt.Println("next step pending: port the registration payload so WhatsApp can return a real pairing QR.")
+		return
 	}
-
-	listResponse, err := client.SendList(
-		context.Background(),
-		"5511999999999@s.whatsapp.net",
-		list,
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("buttons response: %#v\n", buttonResponse)
-	fmt.Printf("list response: %#v\n", listResponse)
+	fmt.Println("connect result:", err)
 }

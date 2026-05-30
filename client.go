@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/BerrySDK/berryone/auth"
 	"github.com/BerrySDK/berryone/events"
@@ -11,6 +12,7 @@ import (
 	"github.com/BerrySDK/berryone/socket"
 	"github.com/BerrySDK/berryone/store"
 	"github.com/BerrySDK/berryone/transport"
+	qrterminal "github.com/mdp/qrterminal/v3"
 )
 
 const maxCarouselCards = 10
@@ -306,14 +308,39 @@ func ValidateSendMessageContent(content SendMessageContent) error {
 	return client.validateMessageContent(content)
 }
 
+func (c *Client) printQRCode(value string) {
+	if !c.options.PrintQRInTerminal || value == "" {
+		return
+	}
+
+	if c.options.QRSmall {
+		qrterminal.GenerateHalfBlock(value, qrterminal.L, os.Stdout)
+		return
+	}
+
+	config := qrterminal.Config{
+		Level:     qrterminal.L,
+		Writer:    os.Stdout,
+		BlackChar: qrterminal.BLACK,
+		WhiteChar: qrterminal.WHITE,
+		QuietZone: 1,
+	}
+
+	qrterminal.GenerateWithConfig(value, config)
+}
+
 func (c *Client) bindInternals() {
 	c.bus.On(events.EventQR, func(payload any) {
 		qr, ok := payload.(string)
 		if !ok {
 			return
 		}
+		if c.lastQR == qr {
+			return
+		}
 		c.lastQR = qr
 		_, _ = c.sessions.Update(c.options.SessionID, events.AuthStateSnapshot{QR: qr})
+		c.printQRCode(qr)
 	})
 
 	c.bus.On(events.EventAuthLink, func(payload any) {

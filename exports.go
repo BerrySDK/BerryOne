@@ -6,6 +6,7 @@ import (
 	"github.com/BerrySDK/berryone/auth"
 	"github.com/BerrySDK/berryone/events"
 	"github.com/BerrySDK/berryone/media"
+	"github.com/BerrySDK/berryone/native"
 	"github.com/BerrySDK/berryone/protocol"
 	"github.com/BerrySDK/berryone/store"
 	"github.com/BerrySDK/berryone/transport"
@@ -78,11 +79,19 @@ type (
 	FileSessionStore             = auth.FileSessionStore
 	LoadedMedia                  = media.LoadedMedia
 	MediaManager                 = media.Manager
+	CompanionBrowser             = native.CompanionBrowser
+	CompanionWebClientType       = native.CompanionWebClientType
+	NativeAuthCredentials        = native.AuthCredentials
+	NativeKeyPair                = native.X25519KeyPair
+	NativeStateRecord            = native.StateRecord
+	NativeFileStore              = native.FileStore
 	BinaryFrameCodec             = protocol.BinaryFrameCodec
 	ProtocolFrame                = protocol.Frame
 	WhatsAppWebConfig            = protocol.WhatsAppWebConfig
 	Transport                    = transport.Transport
 	InMemoryTransport            = transport.InMemoryTransport
+	NativeTransport              = transport.NativeTransport
+	NativeTransportOptions       = transport.NativeTransportOptions
 )
 
 const (
@@ -156,4 +165,19 @@ func NewInMemoryTransport() *InMemoryTransport {
 	return transport.NewInMemoryTransport()
 }
 
+func NewNativeTransport(options NativeTransportOptions) *NativeTransport {
+	return transport.NewNativeTransport(options)
+}
+
+func NewNativeFileStore(rootDir string) *NativeFileStore {
+	return native.NewFileStore(rootDir)
+}
+
 var DefaultWhatsAppWebConfig = protocol.DefaultWhatsAppWebConfig
+var DefaultCompanionBrowser = native.DefaultCompanionBrowser
+
+var (
+	ErrNativeHandshakeNotImplemented = native.ErrHandshakeNotImplemented
+	ErrNativeSocketNotConnected      = native.ErrSocketNotConnected
+	ErrNativeRegistrationPending     = native.ErrRegistrationPayloadPending
+)
