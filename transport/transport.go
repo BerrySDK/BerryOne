@@ -130,10 +130,7 @@ func (t *InMemoryTransport) SendMessage(_ context.Context, to string, content ma
 		Ack:       events.AckPending,
 		Type:      detectKind(content),
 	}
-	message := events.TextMessage{
-		BaseMessage: base,
-		Text:        fmt.Sprintf("%v", content["text"]),
-	}
+	message := buildOutgoingMessage(base, content)
 
 	t.emitLocked(events.EventMessageAck, events.MessageAck{
 		MessageID: base.ID,
@@ -143,6 +140,104 @@ func (t *InMemoryTransport) SendMessage(_ context.Context, to string, content ma
 	})
 	t.emitLocked(events.EventMessageSent, message)
 	return message, nil
+}
+
+func buildOutgoingMessage(base events.BaseMessage, content map[string]any) events.OutgoingMessage {
+	switch base.Type {
+	case "carousel":
+		payload, _ := content["carousel"].(events.CarouselMessagePayload)
+		return events.CarouselMessage{
+			BaseMessage: base,
+			Carousel:    payload,
+		}
+	case "image":
+		payload, _ := content["image"].(*events.MediaPayload)
+		if payload == nil {
+			return events.ImageMessage{BaseMessage: base}
+		}
+		return events.ImageMessage{
+			BaseMessage: base,
+			Media:       *payload,
+		}
+	case "audio":
+		payload, _ := content["audio"].(*events.MediaPayload)
+		if payload == nil {
+			return events.AudioMessage{BaseMessage: base}
+		}
+		return events.AudioMessage{
+			BaseMessage: base,
+			Media:       *payload,
+		}
+	case "document":
+		payload, _ := content["document"].(*events.MediaPayload)
+		if payload == nil {
+			return events.DocumentMessage{BaseMessage: base}
+		}
+		return events.DocumentMessage{
+			BaseMessage: base,
+			Media:       *payload,
+		}
+	case "buttons":
+		payload, _ := content["buttons"].(*events.ButtonsPayload)
+		if payload == nil {
+			return events.ButtonsMessage{BaseMessage: base}
+		}
+		return events.ButtonsMessage{
+			BaseMessage: base,
+			Buttons:     *payload,
+		}
+	case "list":
+		payload, _ := content["list"].(*events.ListPayload)
+		if payload == nil {
+			return events.ListMessage{BaseMessage: base}
+		}
+		return events.ListMessage{
+			BaseMessage: base,
+			List:        *payload,
+		}
+	case "interactive":
+		payload, _ := content["interactive"].(*events.InteractivePayload)
+		if payload == nil {
+			return events.InteractiveMessage{BaseMessage: base}
+		}
+		return events.InteractiveMessage{
+			BaseMessage: base,
+			Interactive: *payload,
+		}
+	case "reaction":
+		payload, _ := content["reaction"].(*events.ReactionMessage)
+		if payload == nil {
+			return events.ReactionMessage{BaseMessage: base}
+		}
+		return events.ReactionMessage{
+			BaseMessage:     base,
+			Emoji:           payload.Emoji,
+			TargetMessageID: payload.TargetMessageID,
+		}
+	case "location":
+		payload, _ := content["location"].(*events.LocationPayload)
+		if payload == nil {
+			return events.LocationMessage{BaseMessage: base}
+		}
+		return events.LocationMessage{
+			BaseMessage: base,
+			Location:    *payload,
+		}
+	case "contact":
+		payload, _ := content["contact"].(*events.ContactPayload)
+		if payload == nil {
+			return events.ContactMessage{BaseMessage: base}
+		}
+		return events.ContactMessage{
+			BaseMessage: base,
+			Contact:     *payload,
+		}
+	default:
+		return events.TextMessage{
+			BaseMessage: base,
+			Text:        fmt.Sprintf("%v", content["text"]),
+		}
+	}
 }
 
 func detectKind(content map[string]any) string {
@@ -165,7 +260,7 @@ func detectKind(content map[string]any) string {
 		return "reaction"
 	case content["location"] != nil:
 		return "location"
-	case content["contact"] != nil:
+	case content["contact"] != nil || content["contacts"] != nil:
 		return "contact"
 	default:
 		return "text"
